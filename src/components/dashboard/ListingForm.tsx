@@ -15,6 +15,7 @@ interface ListingFormProps {
   listing?: any;
   onSuccess: () => void;
   onCancel: () => void;
+  shopId?: string;
 }
 
 const categories = {
@@ -23,7 +24,7 @@ const categories = {
   event: ["Music & Concerts", "Business", "Workshops", "Sports", "Arts & Culture", "Food & Drink", "Charity"],
 };
 
-export function ListingForm({ listing, onSuccess, onCancel }: ListingFormProps) {
+export function ListingForm({ listing, onSuccess, onCancel, shopId }: ListingFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -71,7 +72,7 @@ export function ListingForm({ listing, onSuccess, onCancel }: ListingFormProps) 
 
     setIsLoading(true);
 
-    const listingData = {
+    const listingData: any = {
       user_id: user.id,
       title: formData.title,
       description: formData.description,
@@ -87,6 +88,7 @@ export function ListingForm({ listing, onSuccess, onCancel }: ListingFormProps) 
       images: images,
       status: "available" as const,
     };
+    if (shopId) listingData.shop_id = shopId;
 
     let error;
 
