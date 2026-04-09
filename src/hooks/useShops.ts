@@ -85,22 +85,24 @@ export function useShopBySlug(slug: string | undefined) {
   const [shop, setShop] = useState<Shop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchShop = useCallback(async () => {
     if (!slug) { setIsLoading(false); return; }
-    const fetchShop = async () => {
-      const { data, error } = await supabase
-        .from("shops")
-        .select("*")
-        .eq("slug", slug)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!error && data) setShop(data as Shop);
-      setIsLoading(false);
-    };
-    fetchShop();
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from("shops")
+      .select("*")
+      .eq("slug", slug)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!error && data) setShop(data as Shop);
+    setIsLoading(false);
   }, [slug]);
 
-  return { shop, isLoading };
+  useEffect(() => {
+    fetchShop();
+  }, [fetchShop]);
+
+  return { shop, isLoading, refetch: fetchShop };
 }
 
 export function useMyShop() {
