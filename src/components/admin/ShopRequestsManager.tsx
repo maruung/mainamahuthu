@@ -23,7 +23,7 @@ interface ShopRequest {
   phone: string | null;
   status: string;
   admin_notes: string | null;
-  requested_at: string;
+  created_at: string;
   profile?: { username: string; email: string };
 }
 
@@ -38,9 +38,10 @@ export function ShopRequestsManager() {
 
   const fetchRequests = async () => {
     setIsLoading(true);
-    const { data } = await (supabase.from("shop_creation_requests" as any) as any)
+    const { data } = await supabase
+      .from("shop_creation_requests")
       .select("*")
-      .order("requested_at", { ascending: false });
+      .order("created_at", { ascending: false });
     if (data) {
       const userIds = [...new Set(data.map((r: any) => r.user_id))];
       const { data: profiles } = await supabase.from("profiles").select("user_id, username, email").in("user_id", userIds as string[]);
@@ -55,7 +56,8 @@ export function ShopRequestsManager() {
   const handleAction = async (action: "approved" | "declined") => {
     if (!selected || !user) return;
     setIsProcessing(true);
-    const { error } = await (supabase.from("shop_creation_requests" as any) as any)
+    const { error } = await supabase
+      .from("shop_creation_requests")
       .update({
         status: action,
         reviewed_at: new Date().toISOString(),
@@ -113,7 +115,7 @@ export function ShopRequestsManager() {
                     <p className="text-xs text-muted-foreground">{req.profile?.email}</p>
                   </TableCell>
                   <TableCell>{req.category || "—"}</TableCell>
-                  <TableCell>{format(new Date(req.requested_at), "MMM d, yyyy")}</TableCell>
+                  <TableCell>{format(new Date(req.created_at), "MMM d, yyyy")}</TableCell>
                   <TableCell>
                     <Badge variant={req.status === "approved" ? "default" : req.status === "declined" ? "destructive" : "secondary"}>
                       {req.status === "pending" && <Clock className="h-3 w-3 mr-1" />}

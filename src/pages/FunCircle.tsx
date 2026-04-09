@@ -8,7 +8,7 @@ import { MobileFriendsSheet } from "@/components/fun-circle/MobileFriendsSheet";
 import { ProfileHeader } from "@/components/fun-circle/ProfileHeader";
 import { FunCircleSettingsSheet } from "@/components/fun-circle/FunCircleSettingsSheet";
 import { FunCircleSettingsProvider } from "@/contexts/FunCircleSettingsContext";
-import { useFunCircleStories, ReactionType } from "@/hooks/useFunCircleStories";
+import { useFunCircleStories, ReactionType, Story } from "@/hooks/useFunCircleStories";
 import { useFunCircleMessages } from "@/hooks/useFunCircleMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -219,6 +219,9 @@ function FunCircleContent() {
               <ProfileHeader />
             </div>
 
+            {/* Stories Bar - Facebook style */}
+            <StoriesBar stories={stories} />
+
             {/* Create Story */}
             <CreateStoryForm />
 
@@ -325,6 +328,50 @@ function FunCircleContent() {
         </div>
       )}
     </Layout>
+  );
+}
+
+function StoriesBar({ stories }: { stories: Story[] }) {
+  // Get unique users with their latest story
+  const userStories = useMemo(() => {
+    const map = new Map<string, Story>();
+    for (const s of stories) {
+      if (!map.has(s.user_id)) map.set(s.user_id, s);
+    }
+    return Array.from(map.values()).slice(0, 12);
+  }, [stories]);
+
+  if (userStories.length === 0) return null;
+
+  return (
+    <Card className="p-3">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+        {userStories.map((story) => (
+          <Link
+            key={story.id}
+            to={`/profile/${story.user_id}`}
+            className="flex flex-col items-center gap-1 shrink-0 w-[72px]"
+          >
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full p-[2px] bg-gradient-to-tr from-primary via-accent to-primary">
+                <div className="w-full h-full rounded-full overflow-hidden border-2 border-card">
+                  {story.profile?.avatar_url ? (
+                    <img src={story.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-sm">
+                      {story.profile?.username?.charAt(0).toUpperCase() || "?"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] text-muted-foreground truncate w-full text-center">
+              {story.profile?.username || "User"}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </Card>
   );
 }
 

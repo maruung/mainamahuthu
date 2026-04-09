@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useShopBySlug, useShopFollow } from "@/hooks/useShops";
 import { supabase } from "@/integrations/supabase/untyped-client";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   MapPin, Star, Users, Eye, UserPlus, UserMinus, Package,
   Sparkles, Calendar, Loader2, MessageCircle, Store, CheckCircle,
-  Crown, Phone, Mail, ExternalLink
+  Crown, Phone, Mail, Plus, Share2
 } from "lucide-react";
 import { FaWhatsapp, FaFacebook, FaInstagram, FaXTwitter, FaTiktok, FaYoutube, FaLinkedin, FaTelegram } from "react-icons/fa6";
 import { format } from "date-fns";
@@ -50,6 +50,7 @@ export default function ShopDetail() {
   const { shop, isLoading: shopLoading } = useShopBySlug(slug);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { isFollowing, toggleFollow, isLoading: followLoading } = useShopFollow(shop?.id);
 
   const [listings, setListings] = useState<ShopListing[]>([]);
@@ -59,9 +60,13 @@ export default function ShopDetail() {
   const [reviewRating, setReviewRating] = useState(5);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [tab, setTab] = useState("products");
+  const [followersCount, setFollowersCount] = useState(0);
+
+  const isOwner = user?.id === shop?.user_id;
 
   useEffect(() => {
     if (!shop) return;
+    setFollowersCount(shop.followers_count || 0);
     const fetchListings = async () => {
       const { data } = await supabase
         .from("listings_public")
@@ -79,7 +84,6 @@ export default function ShopDetail() {
         .eq("shop_id", shop.id)
         .order("created_at", { ascending: false });
       if (data) {
-        // Fetch usernames from profiles_public
         const userIds = data.map((r: any) => r.user_id);
         const { data: profiles } = await supabase
           .from("profiles_public")
@@ -97,9 +101,13 @@ export default function ShopDetail() {
     };
     fetchListings();
     fetchReviews();
-    // Increment views
     supabase.from("shops").update({ views_count: (shop.views_count || 0) + 1 }).eq("id", shop.id);
   }, [shop]);
+
+  const handleFollow = async () => {
+    await toggleFollow();
+    setFollowersCount((prev) => (isFollowing ? prev - 1 : prev + 1));
+  };
 
   const handleSubmitReview = async () => {
     if (!user || !shop) {
@@ -115,7 +123,6 @@ export default function ShopDetail() {
     } else {
       toast({ title: "Review submitted!" });
       setReviewText("");
-      // Refetch reviews
       const { data } = await supabase.from("shop_reviews").select("*").eq("shop_id", shop.id).order("created_at", { ascending: false });
       if (data) {
         const userIds = data.map((r: any) => r.user_id);
@@ -148,6 +155,20 @@ export default function ShopDetail() {
     eventDate: listing.event_date ? format(new Date(listing.event_date), "MMM d") : undefined,
   });
 
+  const socialLinks = useMemo(() => {
+    if (!shop) return [];
+    const links = [];
+    if (shop.whatsapp) links.push({ icon: FaWhatsapp, href: `https://wa.me/${shop.whatsapp.replace(/[^0-9]/g, '')}`, color: "bg-green-500/10 text-green-600 hover:bg-green-500/20", label: "WhatsApp" });
+    if (shop.facebook) links.push({ icon: FaFacebook, href: shop.facebook, color: "bg-blue-600/10 text-blue-600 hover:bg-blue-600/20", label: "Facebook" });
+    if (shop.instagram) links.push({ icon: FaInstagram, href: shop.instagram, color: "bg-pink-500/10 text-pink-500 hover:bg-pink-500/20", label: "Instagram" });
+    if (shop.twitter) links.push({ icon: FaXTwitter, href: shop.twitter, color: "bg-foreground/10 text-foreground hover:bg-foreground/20", label: "X" });
+    if (shop.tiktok) links.push({ icon: FaTiktok, href: shop.tiktok, color: "bg-foreground/10 text-foreground hover:bg-foreground/20", label: "TikTok" });
+    if (shop.youtube) links.push({ icon: FaYoutube, href: shop.youtube, color: "bg-red-500/10 text-red-500 hover:bg-red-500/20", label: "YouTube" });
+    if (shop.linkedin) links.push({ icon: FaLinkedin, href: shop.linkedin, color: "bg-blue-700/10 text-blue-700 hover:bg-blue-700/20", label: "LinkedIn" });
+    if (shop.telegram) links.push({ icon: FaTelegram, href: shop.telegram, color: "bg-sky-500/10 text-sky-500 hover:bg-sky-500/20", label: "Telegram" });
+    return links;
+  }, [shop]);
+
   if (shopLoading) {
     return (
       <Layout>
@@ -174,21 +195,56 @@ export default function ShopDetail() {
   }
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-background">
+      {/* Standalone shop header - no main site navbar */}
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur border-b">
+        <div className="container flex items-center justify-between h-14">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10">
+              {shop.logo_url ? (
+                <img src={shop.logo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-primary font-bold text-sm">
+                  {shop.name.charAt(0)}
+                </div>
+              )}
+            </div>
+            <span className="font-semibold text-sm">{shop.name}</span>
+            {shop.is_verified && <CheckCircle className="h-4 w-4 text-primary" />}
+          </div>
+          <div className="flex items-center gap-2">
+            {isOwner && (
+              <Button size="sm" onClick={() => navigate("/dashboard")} className="gap-1">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Listing</span>
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/shops">
+                <Store className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/">Home</Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
       {/* Cover Image */}
-      <div className="relative h-48 md:h-64 overflow-hidden">
+      <div className="relative h-48 md:h-72 overflow-hidden">
         {shop.cover_image_url ? (
           <img src={shop.cover_image_url} alt={shop.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/40 via-accent/20 to-secondary/30" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
       </div>
 
-      <div className="container relative -mt-16 pb-12">
+      <div className="container relative -mt-20 pb-12">
         {/* Shop Header */}
-        <div className="flex flex-col md:flex-row gap-6 items-start mb-8">
-          <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl border-4 border-card bg-card overflow-hidden shadow-lg shrink-0">
+        <div className="flex flex-col md:flex-row gap-5 items-start mb-6">
+          <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl border-4 border-card bg-card overflow-hidden shadow-lg shrink-0">
             {shop.logo_url ? (
               <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover" />
             ) : (
@@ -200,18 +256,17 @@ export default function ShopDetail() {
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <h1 className="font-display text-2xl md:text-3xl font-bold">{shop.name}</h1>
-              {shop.is_verified && (
-                <CheckCircle className="h-6 w-6 text-primary fill-primary/20" />
-              )}
+              {shop.is_verified && <CheckCircle className="h-6 w-6 text-primary fill-primary/20" />}
+              {shop.is_promoted && <Crown className="h-5 w-5 text-gold" />}
             </div>
             {shop.description && (
-              <p className="text-muted-foreground mb-3 max-w-2xl">{shop.description}</p>
+              <p className="text-muted-foreground mb-3 max-w-2xl text-sm">{shop.description}</p>
             )}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-4">
               {shop.location && (
                 <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{shop.location}</span>
               )}
-              <span className="flex items-center gap-1"><Users className="h-4 w-4" />{shop.followers_count} followers</span>
+              <span className="flex items-center gap-1"><Users className="h-4 w-4" />{followersCount} followers</span>
               <span className="flex items-center gap-1"><Eye className="h-4 w-4" />{shop.views_count} views</span>
               <span className="flex items-center gap-1"><Package className="h-4 w-4" />{listings.length} listings</span>
               {shop.rating > 0 && (
@@ -221,15 +276,15 @@ export default function ShopDetail() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <Button
-                onClick={toggleFollow}
-                variant={isFollowing ? "outline" : "default"}
-                disabled={followLoading}
-              >
-                {isFollowing ? <UserMinus className="h-4 w-4 mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
-                {isFollowing ? "Unfollow" : "Follow"}
-              </Button>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {!isOwner && (
+                <Button onClick={handleFollow} variant={isFollowing ? "outline" : "default"} disabled={followLoading} size="sm">
+                  {isFollowing ? <UserMinus className="h-4 w-4 mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
+                  {isFollowing ? "Unfollow" : "Follow"}
+                </Button>
+              )}
               {shop.phone && (
                 <Button variant="outline" size="sm" asChild>
                   <a href={`tel:${shop.phone}`}><Phone className="h-4 w-4 mr-1" />Call</a>
@@ -240,50 +295,28 @@ export default function ShopDetail() {
                   <a href={`mailto:${shop.email}`}><Mail className="h-4 w-4 mr-1" />Email</a>
                 </Button>
               )}
+              {isOwner && (
+                <Button size="sm" variant="default" onClick={() => navigate("/dashboard")} className="gap-1">
+                  <Plus className="h-4 w-4" />Add Listing
+                </Button>
+              )}
             </div>
+
             {/* Social Media Links */}
-            {(shop.whatsapp || shop.facebook || shop.instagram || shop.twitter || shop.tiktok || shop.youtube || shop.linkedin || shop.telegram) && (
+            {socialLinks.length > 0 && (
               <div className="flex items-center gap-2 mt-3 flex-wrap">
-                {shop.whatsapp && (
-                  <a href={`https://wa.me/${shop.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors">
-                    <FaWhatsapp className="h-5 w-5" />
+                {socialLinks.map(({ icon: Icon, href, color, label }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn("p-2.5 rounded-xl transition-colors", color)}
+                    title={label}
+                  >
+                    <Icon className="h-5 w-5" />
                   </a>
-                )}
-                {shop.facebook && (
-                  <a href={shop.facebook} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-blue-600/10 text-blue-600 hover:bg-blue-600/20 transition-colors">
-                    <FaFacebook className="h-5 w-5" />
-                  </a>
-                )}
-                {shop.instagram && (
-                  <a href={shop.instagram} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-pink-500/10 text-pink-500 hover:bg-pink-500/20 transition-colors">
-                    <FaInstagram className="h-5 w-5" />
-                  </a>
-                )}
-                {shop.twitter && (
-                  <a href={shop.twitter} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors">
-                    <FaXTwitter className="h-5 w-5" />
-                  </a>
-                )}
-                {shop.tiktok && (
-                  <a href={shop.tiktok} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors">
-                    <FaTiktok className="h-5 w-5" />
-                  </a>
-                )}
-                {shop.youtube && (
-                  <a href={shop.youtube} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors">
-                    <FaYoutube className="h-5 w-5" />
-                  </a>
-                )}
-                {shop.linkedin && (
-                  <a href={shop.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-blue-700/10 text-blue-700 hover:bg-blue-700/20 transition-colors">
-                    <FaLinkedin className="h-5 w-5" />
-                  </a>
-                )}
-                {shop.telegram && (
-                  <a href={shop.telegram} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 transition-colors">
-                    <FaTelegram className="h-5 w-5" />
-                  </a>
-                )}
+                ))}
               </div>
             )}
           </div>
@@ -304,31 +337,39 @@ export default function ShopDetail() {
           {["products", "services", "events"].map((t) => (
             <TabsContent key={t} value={t} className="mt-0">
               {listingsLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="space-y-3">
+                <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
                       <Skeleton className="aspect-[4/3] rounded-xl" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
+                      <Skeleton className="h-3 w-3/4" />
+                      <Skeleton className="h-2 w-1/2" />
                     </div>
                   ))}
                 </div>
               ) : filteredListings.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {filteredListings.map((l) => (
                     <ListingCard key={l.id} {...mapListing(l)} />
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  No {t} in this shop yet
+                  {isOwner ? (
+                    <div>
+                      <p className="mb-3">No {t} in your shop yet</p>
+                      <Button onClick={() => navigate("/dashboard")} className="gap-1">
+                        <Plus className="h-4 w-4" />Add Your First Listing
+                      </Button>
+                    </div>
+                  ) : (
+                    `No ${t} in this shop yet`
+                  )}
                 </div>
               )}
             </TabsContent>
           ))}
 
           <TabsContent value="reviews" className="mt-0">
-            {/* Review form */}
             {user && (
               <div className="mb-8 p-4 rounded-xl border bg-card">
                 <h3 className="font-semibold mb-3">Leave a Review</h3>
@@ -385,7 +426,7 @@ export default function ShopDetail() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </div>
   );
 }
 
@@ -406,7 +447,7 @@ function ShopAdsBanner({ shopId }: { shopId: string }) {
   if (ads.length === 0) return null;
 
   return (
-    <div className="mb-6 space-y-3">
+    <div className="mb-6 grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
       {ads.map((ad) => (
         <a
           key={ad.id}
@@ -416,15 +457,15 @@ function ShopAdsBanner({ shopId }: { shopId: string }) {
           className="block rounded-xl overflow-hidden border hover:shadow-md transition-shadow"
         >
           {ad.image_url && (
-            <img src={ad.image_url} alt={ad.title} className="w-full h-32 md:h-48 object-cover" />
+            <img src={ad.image_url} alt={ad.title} className="w-full aspect-[4/3] object-cover" />
           )}
-          <div className="p-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">Sponsored</Badge>
-              <p className="font-medium text-sm">{ad.title}</p>
+          <div className="p-2">
+            <div className="flex items-center gap-1">
+              <Badge variant="secondary" className="text-[10px]">Sponsored</Badge>
+              <p className="font-medium text-xs line-clamp-1">{ad.title}</p>
             </div>
             {ad.description && (
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ad.description}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{ad.description}</p>
             )}
           </div>
         </a>

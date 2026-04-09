@@ -149,9 +149,11 @@ export function useShopFollow(shopId: string | undefined) {
     setIsLoading(true);
     if (isFollowing) {
       await supabase.from("shop_followers").delete().eq("shop_id", shopId).eq("user_id", user.id);
+      await supabase.from("shops").update({ followers_count: Math.max(0, (await supabase.from("shop_followers").select("id", { count: "exact" }).eq("shop_id", shopId)).count || 0) }).eq("id", shopId);
       setIsFollowing(false);
     } else {
       await supabase.from("shop_followers").insert({ shop_id: shopId, user_id: user.id });
+      await supabase.from("shops").update({ followers_count: (await supabase.from("shop_followers").select("id", { count: "exact" }).eq("shop_id", shopId)).count || 0 }).eq("id", shopId);
       setIsFollowing(true);
     }
     setIsLoading(false);
