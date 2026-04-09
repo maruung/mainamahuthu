@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFunCircleStories, Comment } from "@/hooks/useFunCircleStories";
+import { supabase } from "@/integrations/supabase/untyped-client";
 import { Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface StoryCommentsProps {
   storyId: string;
@@ -15,7 +17,9 @@ interface StoryCommentsProps {
 
 export function StoryComments({ storyId }: StoryCommentsProps) {
   const { user } = useAuth();
+  const { isAdmin } = useAuth();
   const { getComments, addComment } = useFunCircleStories();
+  const { toast } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +38,6 @@ export function StoryComments({ storyId }: StoryCommentsProps) {
 
   const handleSubmit = async () => {
     if (!newComment.trim() || isSending) return;
-
     setIsSending(true);
     const result = await addComment(storyId, newComment.trim());
     if (result) {
@@ -42,6 +45,14 @@ export function StoryComments({ storyId }: StoryCommentsProps) {
       setNewComment("");
     }
     setIsSending(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const { error } = await supabase.from("fun_circle_comments").delete().eq("id", commentId);
+    if (!error) {
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      toast({ title: "Comment deleted" });
+    }
   };
 
   return (
@@ -58,7 +69,7 @@ export function StoryComments({ storyId }: StoryCommentsProps) {
         ) : (
           <div className="space-y-3">
             {comments.map(comment => (
-              <div key={comment.id} className="flex gap-2">
+              <div key={comment.id} className="flex gap-2 group">
                 <Link to={`/profile/${comment.user_id}`}>
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={comment.profile?.avatar_url || ""} />
@@ -69,12 +80,24 @@ export function StoryComments({ storyId }: StoryCommentsProps) {
                 </Link>
                 <div className="flex-1">
                   <div className="bg-background rounded-lg px-3 py-2">
-                    <Link 
-                      to={`/profile/${comment.user_id}`}
-                      className="font-medium text-sm hover:underline"
-                    >
-                      {comment.profile?.username || "Unknown"}
-                    </Link>
+                    <div className="flex items-center justify-between">
+                      <Link
+                        to={`/profile/${comment.user_id}`}
+                        className="font-medium text-sm hover:underline"
+                      >
+                        {comment.profile?.username || "Unknown"}
+                      </Link>
+                      {(isAdmin || comment.user_id === user?.id) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleDeleteComment(comment.id)}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm">{comment.content}</p>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 ml-2">
