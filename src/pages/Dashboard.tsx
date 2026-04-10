@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash2, Package, Sparkles, Calendar, TrendingUp, Heart, Loader2, User, Shield, Store, Mail } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Package, Sparkles, Calendar, TrendingUp, Heart, Loader2, User, Shield, Store, Mail, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/untyped-client";
@@ -19,6 +19,8 @@ import { ProfileEditor } from "@/components/profile/ProfileEditor";
 import { FavoritesList } from "@/components/dashboard/FavoritesList";
 import { MyShopPanel } from "@/components/dashboard/MyShopPanel";
 import { DashboardMessages } from "@/components/dashboard/DashboardMessages";
+import { CartPanel } from "@/components/dashboard/CartPanel";
+import { PromotionReminder } from "@/components/dashboard/PromotionReminder";
 import { cn, parseImages } from "@/lib/utils";
 
 interface Listing {
@@ -130,6 +132,7 @@ export default function Dashboard() {
               <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="listings"><Package className="h-4 w-4 mr-1" />Listings</TabsTrigger>
                 <TabsTrigger value="shop"><Store className="h-4 w-4 mr-1" />My Shop</TabsTrigger>
+                <TabsTrigger value="cart"><ShoppingCart className="h-4 w-4 mr-1" />Cart</TabsTrigger>
                 <TabsTrigger value="messages"><Mail className="h-4 w-4 mr-1" />Messages</TabsTrigger>
                 <TabsTrigger value="favorites"><Heart className="h-4 w-4 mr-1" />Favorites</TabsTrigger>
                 <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" />Profile</TabsTrigger>
@@ -146,6 +149,8 @@ export default function Dashboard() {
           <MyShopPanel />
         ) : dashboardTab === "messages" ? (
           <DashboardMessages />
+        ) : dashboardTab === "cart" ? (
+          <CartPanel />
         ) : (
           <>
             {/* Stats Grid */}
@@ -249,6 +254,13 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Promotion Reminder */}
+            {filteredListings.length > 0 && (
+              <div className="mt-4">
+                <PromotionReminder listingType={filteredListings[0].listing_type} />
+              </div>
+            )}
           </>
         )}
       </div>

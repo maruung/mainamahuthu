@@ -4,7 +4,7 @@ import { useShopBySlug, useShopFollow } from "@/hooks/useShops";
 import { supabase } from "@/integrations/supabase/untyped-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ListingCard } from "@/components/listings/ListingCard";
-import { ListingForm } from "@/components/dashboard/ListingForm";
+
 import { ShopProfileEditor } from "@/components/shops/ShopProfileEditor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,7 @@ export default function ShopDetail() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isFollowing, toggleFollow, isLoading: followLoading } = useShopFollow(shop?.id);
+  const { isFollowing, toggleFollow, isLoading: followLoading, followersCount } = useShopFollow(shop?.id);
 
   const [listings, setListings] = useState<ShopListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
@@ -62,8 +62,6 @@ export default function ShopDetail() {
   const [reviewRating, setReviewRating] = useState(5);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [tab, setTab] = useState("products");
-  const [followersCount, setFollowersCount] = useState(0);
-  const [showListingForm, setShowListingForm] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
 
   const isOwner = user?.id === shop?.user_id;
@@ -82,7 +80,6 @@ export default function ShopDetail() {
 
   useEffect(() => {
     if (!shop) return;
-    setFollowersCount(shop.followers_count || 0);
     fetchListings();
     const fetchReviews = async () => {
       const { data } = await supabase
@@ -112,7 +109,6 @@ export default function ShopDetail() {
 
   const handleFollow = async () => {
     await toggleFollow();
-    setFollowersCount((prev) => (isFollowing ? prev - 1 : prev + 1));
   };
 
   const handleSubmitReview = async () => {
@@ -221,7 +217,7 @@ export default function ShopDetail() {
           <div className="flex items-center gap-2">
             {isOwner && (
               <>
-                <Button size="sm" onClick={() => setShowListingForm(true)} className="gap-1">
+                <Button size="sm" onClick={() => navigate("/dashboard?tab=shop&manageAds=1")} className="gap-1">
                   <Plus className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Add Listing</span>
                 </Button>
@@ -324,7 +320,7 @@ export default function ShopDetail() {
                 </Button>
               )}
               {isOwner && (
-                <Button size="sm" variant="default" onClick={() => setShowListingForm(true)} className="gap-1">
+                <Button size="sm" variant="default" onClick={() => navigate("/dashboard?tab=shop&manageAds=1")} className="gap-1">
                   <Plus className="h-4 w-4" />Add Listing
                 </Button>
               )}
@@ -385,7 +381,7 @@ export default function ShopDetail() {
                   {isOwner ? (
                     <div>
                       <p className="mb-3">No {t} in your shop yet</p>
-                      <Button onClick={() => setShowListingForm(true)} className="gap-1">
+                      <Button onClick={() => navigate("/dashboard?tab=shop&manageAds=1")} className="gap-1">
                         <Plus className="h-4 w-4" />Add Your First Listing
                       </Button>
                     </div>
@@ -455,22 +451,6 @@ export default function ShopDetail() {
         </Tabs>
       </div>
 
-      {/* Add Listing Dialog */}
-      <Dialog open={showListingForm} onOpenChange={setShowListingForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Listing to {shop.name}</DialogTitle>
-          </DialogHeader>
-          <ListingForm
-            shopId={shop.id}
-            onSuccess={() => {
-              setShowListingForm(false);
-              fetchListings();
-            }}
-            onCancel={() => setShowListingForm(false)}
-          />
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Shop Profile Dialog */}
       <Dialog open={showProfileEditor} onOpenChange={setShowProfileEditor}>

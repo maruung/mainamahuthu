@@ -139,7 +139,7 @@ export function ProfileHeader() {
                 <CheckCircle className="h-4 w-4 text-primary shrink-0" />
               )}
             </div>
-            <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
+            <p className="text-sm text-muted-foreground truncate">{profile.location || "Fun Circle member"}</p>
             {profile.location && (
               <p className="text-xs text-muted-foreground mt-1">{profile.location}</p>
             )}
