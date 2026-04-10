@@ -129,37 +129,87 @@ export function useMyShop() {
 export function useShopFollow(shopId: string | undefined) {
   const { user } = useAuth();
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  const fetchFollowState = useCallback(async () => {
+    if (!shopId) {
+      setIsFollowing(false);
+      setFollowersCount(0);
+      return;
+    }
+
+    const [countResult, followResult] = await Promise.all([
+      supabase
+        .from("shop_followers")
+        .select("id", { count: "exact", head: true })
+        .eq("shop_id", shopId),
+      user
+        ? supabase
+            .from("shop_followers")
+            .select("id")
+            .eq("shop_id", shopId)
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (!countResult.error) {
+      setFollowersCount(countResult.count || 0);
+    }
+
+    if (!followResult.error) {
+      setIsFollowing(!!followResult.data);
+    } else if (!user) {
+      setIsFollowing(false);
+    }
+  }, [shopId, user]);
+
   useEffect(() => {
-    if (!user || !shopId) return;
-    supabase
-      .from("shop_followers")
-      .select("id")
-      .eq("shop_id", shopId)
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => setIsFollowing(!!data));
-  }, [user, shopId]);
+    void fetchFollowState();
+  }, [fetchFollowState]);
 
   const toggleFollow = async () => {
     if (!user || !shopId) {
       toast({ title: "Sign in to follow shops", variant: "destructive" });
-      return;
+      return false;
     }
+
     setIsLoading(true);
-    if (isFollowing) {
-      await supabase.from("shop_followers").delete().eq("shop_id", shopId).eq("user_id", user.id);
-      await supabase.from("shops").update({ followers_count: Math.max(0, (await supabase.from("shop_followers").select("id", { count: "exact" }).eq("shop_id", shopId)).count || 0) }).eq("id", shopId);
-      setIsFollowing(false);
-    } else {
-      await supabase.from("shop_followers").insert({ shop_id: shopId, user_id: user.id });
-      await supabase.from("shops").update({ followers_count: (await supabase.from("shop_followers").select("id", { count: "exact" }).eq("shop_id", shopId)).count || 0 }).eq("id", shopId);
-      setIsFollowing(true);
+    const previousFollowing = isFollowing;
+    const previousFollowersCount = followersCount;
+
+    setIsFollowing(!previousFollowing);
+    setFollowersCount(Math.max(0, previousFollowersCount + (previousFollowing ? -1 : 1)));
+
+    const { error } = previousFollowing
+      ? await supabase.from("shop_followers").delete().eq("shop_id", shopId).eq("user_id", user.id)
+      : await supabase.from("shop_followers").insert({ shop_id: shopId, user_id: user.id });
+
+    if (error) {
+      setIsFollowing(previousFollowing);
+      setFollowersCount(previousFollowersCount);
+      toast({
+        title: "Could not update follow status",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return false;
     }
+
+    toast({
+      title: previousFollowing ? "Shop unfollowed" : "Shop followed",
+      description: previousFollowing
+        ? "You will no longer receive updates from this shop."
+        : "You'll now see updates from this shop more easily.",
+    });
+
+    await fetchFollowState();
     setIsLoading(false);
+    return true;
   };
 
-  return { isFollowing, toggleFollow, isLoading };
+  return { isFollowing, toggleFollow, isLoading, followersCount, refreshFollowState: fetchFollowState };
 }

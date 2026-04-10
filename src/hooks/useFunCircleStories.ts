@@ -52,6 +52,20 @@ const defaultReactionCounts: ReactionCounts = {
   angry: 0,
 };
 
+const buildReactionCounts = (
+  reactions: Array<{ story_id: string; reaction_type: ReactionType }>
+) => {
+  const countsByStory = new Map<string, ReactionCounts>();
+
+  reactions.forEach((reaction) => {
+    const currentCounts = countsByStory.get(reaction.story_id) || { ...defaultReactionCounts };
+    currentCounts[reaction.reaction_type] += 1;
+    countsByStory.set(reaction.story_id, currentCounts);
+  });
+
+  return countsByStory;
+};
+
 export function useFunCircleStories() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -80,7 +94,7 @@ export function useFunCircleStories() {
       const storyIds = data.map(s => s.id);
 
       // Parallel fetch for profiles, reactions, and mentions
-      const [profilesResult, reactionsResult, mentionsResult] = await Promise.all([
+      const [profilesResult, reactionsResult, mentionsResult, allReactionsResult] = await Promise.all([
         supabase
           .from("profiles_public")
           .select("user_id, username, avatar_url")
@@ -96,11 +110,18 @@ export function useFunCircleStories() {
           .from("fun_circle_mentions")
           .select("story_id, mentioned_user_id")
           .in("story_id", storyIds),
+        supabase
+          .from("fun_circle_story_reactions")
+          .select("story_id, reaction_type")
+          .in("story_id", storyIds),
       ]);
 
       const profiles = profilesResult.data || [];
       const userReactions = new Map<string, ReactionType>(
         (reactionsResult.data || []).map(r => [r.story_id, r.reaction_type as ReactionType])
+      );
+      const reactionCountsByStory = buildReactionCounts(
+        ((allReactionsResult.data || []) as Array<{ story_id: string; reaction_type: ReactionType }>)
       );
 
       const mentionsByStory = new Map<string, string[]>();
@@ -111,11 +132,10 @@ export function useFunCircleStories() {
 
       // Build stories with all related data
       const storiesWithProfiles = data.map(story => {
-        const rawReactions = story.reactions_count as unknown as ReactionCounts;
         return {
           ...story,
-          images: story.images || [],
-          reactions_count: rawReactions || defaultReactionCounts,
+          images: Array.isArray(story.images) ? story.images : [],
+          reactions_count: reactionCountsByStory.get(story.id) || { ...defaultReactionCounts },
           profile: profiles.find(p => p.user_id === story.user_id),
           user_reaction: userReactions.get(story.id) || null,
           mentions: mentionsByStory.get(story.id) || [],
@@ -220,18 +240,25 @@ export function useFunCircleStories() {
         .eq("story_id", storyId)
         .eq("user_id", user.id);
 
-      if (!error) {
+      if (error) {
+        toast({
+          title: "Reaction failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
         setStories(prev =>
           prev.map(s => {
             if (s.id === storyId) {
               const newCounts = { ...s.reactions_count };
-              if (existingReaction) newCounts[existingReaction]--;
+              if (existingReaction) newCounts[existingReaction] = Math.max(0, newCounts[existingReaction] - 1);
               newCounts[reactionType]++;
               return { ...s, user_reaction: reactionType, reactions_count: newCounts };
             }
             return s;
           })
         );
+        void fetchStories();
       }
     } else {
       // Insert new reaction
@@ -243,7 +270,13 @@ export function useFunCircleStories() {
           reaction_type: reactionType,
         });
 
-      if (!error) {
+      if (error) {
+        toast({
+          title: "Reaction failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
         setStories(prev =>
           prev.map(s => {
             if (s.id === storyId) {
@@ -254,6 +287,7 @@ export function useFunCircleStories() {
             return s;
           })
         );
+        void fetchStories();
       }
     }
   };
@@ -270,17 +304,24 @@ export function useFunCircleStories() {
       .eq("story_id", storyId)
       .eq("user_id", user.id);
 
-    if (!error && existingReaction) {
+    if (error) {
+      toast({
+        title: "Could not remove reaction",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else if (existingReaction) {
       setStories(prev =>
         prev.map(s => {
           if (s.id === storyId) {
             const newCounts = { ...s.reactions_count };
-            newCounts[existingReaction]--;
+            newCounts[existingReaction] = Math.max(0, newCounts[existingReaction] - 1);
             return { ...s, user_reaction: null, reactions_count: newCounts };
           }
           return s;
         })
       );
+      void fetchStories();
     }
   };
 

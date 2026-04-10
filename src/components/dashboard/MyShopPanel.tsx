@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useMyShop } from "@/hooks/useShops";
 import { CreateShopForm } from "@/components/shops/CreateShopForm";
 import { ShopPromotionButton } from "@/components/dashboard/ShopPromotionButton";
@@ -13,6 +14,13 @@ export function MyShopPanel() {
   const { shop, isLoading, refetch } = useMyShop();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [showAds, setShowAds] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("manageAds") === "1") {
+      setShowAds(true);
+    }
+  }, [searchParams]);
 
   if (isLoading) {
     return (
