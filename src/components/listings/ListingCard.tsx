@@ -1,10 +1,11 @@
 import { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Heart, MapPin, Star, Clock } from "lucide-react";
+import { Heart, MapPin, Star, Clock, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useCart } from "@/hooks/useCart";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 
 interface ListingCardProps {
@@ -38,13 +39,21 @@ export const ListingCard = memo(function ListingCard({
 }: ListingCardProps) {
   const categoryPath = category === "product" ? "products" : category === "service" ? "services" : "events";
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isInCart, addToCart } = useCart();
   const isFav = isFavorite(id);
+  const inCart = isInCart(id);
 
   const handleFavoriteClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     toggleFavorite(id);
   }, [id, toggleFavorite]);
+
+  const handleCartClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart(id);
+  }, [id, addToCart]);
   
   return (
     <Link to={`/${categoryPath}/${id}`} className="group">
@@ -83,18 +92,31 @@ export const ListingCard = memo(function ListingCard({
             )}
           </div>
           
-          {/* Favorite Button */}
-          <Button
-            variant="glass"
-            size="icon"
-            className={cn(
-              "absolute top-2 right-2 h-8 w-8 transition-opacity",
-              isFav ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            )}
-            onClick={handleFavoriteClick}
-          >
-            <Heart className={cn("h-4 w-4", isFav && "fill-destructive text-destructive")} />
-          </Button>
+          {/* Action Buttons */}
+          <div className="absolute top-2 right-2 flex flex-col gap-1">
+            <Button
+              variant="glass"
+              size="icon"
+              className={cn(
+                "h-8 w-8 transition-opacity",
+                isFav ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              )}
+              onClick={handleFavoriteClick}
+            >
+              <Heart className={cn("h-4 w-4", isFav && "fill-destructive text-destructive")} />
+            </Button>
+            <Button
+              variant="glass"
+              size="icon"
+              className={cn(
+                "h-8 w-8 transition-opacity",
+                inCart ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              )}
+              onClick={handleCartClick}
+            >
+              <ShoppingCart className={cn("h-4 w-4", inCart && "fill-primary text-primary")} />
+            </Button>
+          </div>
         </div>
 
         {/* Content */}
